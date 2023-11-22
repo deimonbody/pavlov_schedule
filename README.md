@@ -13,6 +13,7 @@
 * Joi
 * React-hook-form
 * React-Router
+* Firebase
 
 
 ## Setup
