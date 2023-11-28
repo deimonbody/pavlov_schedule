@@ -1,14 +1,13 @@
 import { ActionReducerMapBuilder, isAnyOf } from '@reduxjs/toolkit';
-import { getDaysOfMonth } from '@/helpers/getDaysOfMonth';
 import { IInitialState } from './common';
 import {
   setNewYearAndMonthAction,
   nextMonth,
   prevMonth,
   setDays,
-  addNewIdea,
-  editIdeaAction,
   deleteIdeaAction,
+  editIdeaAction,
+  addNewIdea,
 } from './actions';
 
 export const calendarReducer = (builder: ActionReducerMapBuilder<IInitialState>) => {
@@ -34,12 +33,10 @@ export const calendarReducer = (builder: ActionReducerMapBuilder<IInitialState>)
       state.currentMonth = month;
       state.currentYear = year;
     })
-    .addCase(setDays, (state, actions) => {
-      state.days = actions.payload.days;
-    })
-    .addMatcher(isAnyOf(deleteIdeaAction, addNewIdea, editIdeaAction), (state, actions) => {
-      if (actions.payload) {
-        state.days = getDaysOfMonth(state.currentYear, state.currentMonth, state.countOfDays);
+    .addMatcher(
+      isAnyOf(deleteIdeaAction.fulfilled, editIdeaAction.fulfilled, setDays.fulfilled, addNewIdea.fulfilled),
+      (state, actions) => {
+        state.days = actions.payload;
       }
-    });
+    );
 };

@@ -1,11 +1,8 @@
-import { createAction } from '@reduxjs/toolkit';
+import { createAction, createAsyncThunk } from '@reduxjs/toolkit';
 import dayjs from 'dayjs';
 
-import { getDaysOfMonth } from '@/helpers/getDaysOfMonth';
-import { IIdea } from '@/types';
-
-import { CalendarService } from '@/services/Calendar.service';
-import { CalendarActions } from './common';
+import { calendarService } from '@/services';
+import { CalendarActions, ISetDaysProps, IAddNewIdeaProps, IDeleteIdeaProps, IEditIdeaProps } from './common';
 
 export const nextMonth = createAction(CalendarActions.NEXT_MONTH, (currentMonth: number, currentYear: number) => {
   const currentDate = dayjs().month(currentMonth).year(currentYear);
@@ -62,47 +59,42 @@ export const setNewYearAndMonthAction = createAction(CalendarActions.SET_NEW_YEA
   };
 });
 
-export const setDays = createAction(
+export const setDays = createAsyncThunk(
   CalendarActions.SET_DAYS,
-  (currentYear: number, currentMonth: number, countOfDays: number) => {
-    const days = getDaysOfMonth(currentYear, currentMonth, countOfDays);
-    return {
-      payload: {
-        days,
-      },
-    };
+  async ({ countOfDays, currentMonth, currentYear }: ISetDaysProps) => {
+    const days = await calendarService.getData(currentYear, currentMonth, countOfDays);
+    return days;
   }
 );
 
-export const addNewIdea = createAction(
+export const addNewIdea = createAsyncThunk(
   CalendarActions.ADD_NEW_IDEA,
-  (newIdea: IIdea, currentYear: number, currentMonth: number) => {
+  async ({ newIdea, currentMonth, currentYear, countOfDays }: IAddNewIdeaProps) => {
     const dataOfIdea = dayjs(newIdea.dayFormat, 'DD/MM/YYYY');
 
     const yearOfIdea = dataOfIdea.year();
     const monthOfIdea = dataOfIdea.month();
-    CalendarService.addNewIdea(newIdea, dataOfIdea, yearOfIdea, monthOfIdea);
+    await calendarService.addData(newIdea, dataOfIdea, yearOfIdea, monthOfIdea);
 
-    if (currentYear === yearOfIdea && currentMonth === monthOfIdea) {
-      return {
-        payload: { newIdea },
-      };
-    }
-    return { payload: null };
+    const newDays = await calendarService.getData(currentYear, currentMonth, countOfDays);
+    return newDays;
   }
 );
 
-export const editIdeaAction = createAction(CalendarActions.EDIT_IDEA, (editIdea: IIdea) => {
-  CalendarService.editIdea(editIdea);
+export const editIdeaAction = createAsyncThunk(
+  CalendarActions.EDIT_IDEA,
+  async ({ editIdea, countOfDays, currentMonth, currentYear }: IEditIdeaProps) => {
+    await calendarService.editData(editIdea);
+    const newDays = await calendarService.getData(currentYear, currentMonth, countOfDays);
+    return newDays;
+  }
+);
 
-  return {
-    payload: { editIdea },
-  };
-});
-
-export const deleteIdeaAction = createAction(CalendarActions.DELETE_IDEA, (id: string) => {
-  CalendarService.deleteIdea(id);
-  return {
-    payload: { id },
-  };
-});
+export const deleteIdeaAction = createAsyncThunk(
+  CalendarActions.DELETE_IDEA,
+  async ({ id, countOfDays, currentMonth, currentYear }: IDeleteIdeaProps) => {
+    await calendarService.deleteData(id);
+    const newDays = await calendarService.getData(currentYear, currentMonth, countOfDays);
+    return newDays;
+  }
+);

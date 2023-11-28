@@ -12,7 +12,7 @@ import { addNewFormSchema } from '@/constants/schemas';
 import { IFormProps, IIdea } from '@/types';
 import { useAppDispatch, useAppSelector } from '@/redux/hooks';
 import { addNewIdea } from '@/redux/calendar/actions';
-import { selectCurrentMonth, selectCurrentYear } from '@/redux/calendar/select';
+import { selectCurrentCountOfDays, selectCurrentMonth, selectCurrentYear } from '@/redux/calendar/select';
 
 interface IProps {
   closeModal: () => void;
@@ -20,7 +20,8 @@ interface IProps {
 
 const Form: React.FC<IProps> = ({ closeModal }) => {
   const currentYear = useAppSelector(selectCurrentYear);
-  const currentMontn = useAppSelector(selectCurrentMonth);
+  const currentMonth = useAppSelector(selectCurrentMonth);
+  const countOfDays = useAppSelector(selectCurrentCountOfDays);
   const dispatch = useAppDispatch();
   const { control, handleSubmit } = useForm<IFormProps>({
     mode: 'all',
@@ -44,7 +45,8 @@ const Form: React.FC<IProps> = ({ closeModal }) => {
       updatedAt: dayjs().format('DD.MM.YYYY HH:mm'),
     };
 
-    dispatch(addNewIdea(newIdea, currentYear, currentMontn));
+    dispatch(addNewIdea({ newIdea, currentMonth, currentYear, countOfDays }));
+
     closeModal();
   };
 

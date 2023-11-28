@@ -11,7 +11,7 @@ import { addNewFormSchema } from '@/constants/schemas';
 import { FormContainer } from '@/components/styled';
 import Input from '@/components/shared/Input';
 import { addNewIdea, deleteIdeaAction, editIdeaAction } from '@/redux/calendar/actions';
-import { selectCurrentMonth, selectCurrentYear } from '@/redux/calendar/select';
+import { selectCurrentCountOfDays, selectCurrentMonth, selectCurrentYear } from '@/redux/calendar/select';
 
 interface IProps {
   idea: IIdea | null;
@@ -22,6 +22,7 @@ const Form: React.FC<IProps> = ({ idea, closeModal }) => {
   const dispatch = useAppDispatch();
   const currentYear = useAppSelector(selectCurrentYear);
   const currentMonth = useAppSelector(selectCurrentMonth);
+  const countOfDays = useAppSelector(selectCurrentCountOfDays);
   const { control, handleSubmit } = useForm<IFormProps>({
     mode: 'all',
     defaultValues: {
@@ -45,15 +46,20 @@ const Form: React.FC<IProps> = ({ idea, closeModal }) => {
     };
 
     if (newIdea.dayFormat !== idea?.dayFormat) {
-      dispatch(deleteIdeaAction(idea?.id as string));
-      dispatch(addNewIdea(newIdea, currentYear, currentMonth));
+      dispatch(deleteIdeaAction({ id: idea?.id as string, currentYear, currentMonth, countOfDays }))
+        .unwrap()
+        .then(() => {
+          dispatch(addNewIdea({ newIdea, currentYear, currentMonth, countOfDays }));
+        });
     } else {
-      dispatch(editIdeaAction(newIdea));
+      dispatch(editIdeaAction({ editIdea: newIdea, currentYear, currentMonth, countOfDays }));
     }
     closeModal();
   };
+
   const deleteHandler = () => {
-    dispatch(deleteIdeaAction(idea?.id as string));
+    dispatch(deleteIdeaAction({ id: idea?.id as string, currentYear, currentMonth, countOfDays }));
+
     closeModal();
   };
 

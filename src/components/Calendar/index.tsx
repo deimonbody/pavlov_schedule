@@ -39,7 +39,7 @@ const Calendar: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    dispatch(setDays(year, month, countOfDays));
+    dispatch(setDays({ currentYear: year, countOfDays, currentMonth: month }));
     localStorage.setItem(
       LocalStorageKeys.filters,
       JSON.stringify({ date: dayjs().month(month).year(year).format('DD/MM/YYYY') })

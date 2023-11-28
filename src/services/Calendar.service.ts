@@ -1,15 +1,49 @@
-import { IIdea, ILocalStorageDays, LocalStorageKeys } from '@/types';
+import { DataService } from '@/services/Data.service';
+import { ICalendarDay, IIdea, ILocalStorageDays, LocalStorageKeys } from '@/types';
 import dayjs from 'dayjs';
 
 export class CalendarService {
-  static addNewIdea(newIdea: IIdea, dataOfIdea: dayjs.Dayjs, yearOfIdea: number, monthOfIdea: number) {
+  private dataService: DataService;
+
+  constructor(dataService: DataService) {
+    this.dataService = dataService;
+  }
+
+  async getData(currentYear: number, currentMonth: number, daysOfMonth: number): Promise<ICalendarDay[]> {
+    const result: ICalendarDay[] = [];
+
+    let daysFromLocalStorage: ICalendarDay[] = [];
+    const dataFromDB = await this.dataService.getData<ILocalStorageDays[]>(LocalStorageKeys.DAYS);
+
+    if (dataFromDB) {
+      const daysByCurrentYearAndMonth = dataFromDB.find(
+        ({ year, month }) => year === currentYear && month === currentMonth
+      )?.days;
+      daysFromLocalStorage = daysByCurrentYearAndMonth || [];
+    }
+
+    for (let i = 1; i <= daysOfMonth; i++) {
+      const date = dayjs().month(currentMonth).date(i);
+      const sameElement = daysFromLocalStorage.find((el) => el.fullDate === date.format('DD/MM/YYYY'));
+      if (sameElement) {
+        result.push(sameElement);
+      } else {
+        result.push({
+          dayNumber: date.date(),
+          dayOfWeek: dayjs().date(date.date()).format('dd'),
+          fullDate: date.format('DD/MM/YYYY'),
+          ideas: [],
+        });
+      }
+    }
+
+    return result;
+  }
+
+  async addData(newIdea: IIdea, dataOfIdea: dayjs.Dayjs, yearOfIdea: number, monthOfIdea: number): Promise<void> {
     const dayOfIdea = dataOfIdea.date();
     const dayOfWeek = dayjs().date(dataOfIdea.date()).format('dd');
-
-    const localStorageData = localStorage.getItem(LocalStorageKeys.DAYS);
-    const daysFromLocalStorage: ILocalStorageDays[] = localStorageData
-      ? (JSON.parse(localStorageData) as ILocalStorageDays[])
-      : [];
+    const dataFromDB = await this.dataService.getData<ILocalStorageDays[]>(LocalStorageKeys.DAYS);
 
     const newDay = {
       dayNumber: dayOfIdea,
@@ -18,12 +52,12 @@ export class CalendarService {
       ideas: [newIdea],
     };
 
-    if (daysFromLocalStorage.length) {
-      const existingYearAndMonthIndex = daysFromLocalStorage.findIndex(
+    if (dataFromDB && dataFromDB.length) {
+      const existingYearAndMonthIndex = dataFromDB.findIndex(
         (el) => el.year === yearOfIdea && el.month === monthOfIdea
       );
 
-      let newCalendarDays = daysFromLocalStorage;
+      let newCalendarDays = dataFromDB;
       if (existingYearAndMonthIndex >= 0) {
         newCalendarDays = newCalendarDays.map((el, index) => {
           if (index === existingYearAndMonthIndex) {
@@ -54,73 +88,70 @@ export class CalendarService {
         ];
       }
 
-      localStorage.setItem(LocalStorageKeys.DAYS, JSON.stringify(newCalendarDays));
+      await this.dataService.editData(LocalStorageKeys.DAYS, newCalendarDays);
     } else {
-      localStorage.setItem(
-        LocalStorageKeys.DAYS,
-        JSON.stringify([
-          {
-            year: yearOfIdea,
-            month: monthOfIdea,
-            days: [newDay],
-          },
-        ])
-      );
+      await this.dataService.editData(LocalStorageKeys.DAYS, [
+        {
+          year: yearOfIdea,
+          month: monthOfIdea,
+          days: [newDay],
+        },
+      ]);
     }
   }
 
-  static editIdea(editIdea: IIdea) {
-    const localStorageData = localStorage.getItem(LocalStorageKeys.DAYS);
-    const daysFromLocalStorage = JSON.parse(localStorageData as string) as ILocalStorageDays[];
-
-    const newCalendarDays = daysFromLocalStorage.map((el) => {
-      const newDays = el.days.map((day) => {
-        const newIdeas = day.ideas.map((idea) => (idea.id === editIdea.id ? editIdea : idea));
+  async editData(editIdea: IIdea): Promise<void> {
+    const dataFromDB = await this.dataService.getData<ILocalStorageDays[]>(LocalStorageKeys.DAYS);
+    if (dataFromDB) {
+      const newCalendarDays = dataFromDB.map((el) => {
+        const newDays = el.days.map((day) => {
+          const newIdeas = day.ideas.map((idea) => (idea.id === editIdea.id ? editIdea : idea));
+          return {
+            ...day,
+            ideas: newIdeas,
+          };
+        });
         return {
-          ...day,
-          ideas: newIdeas,
+          ...el,
+          days: newDays,
         };
       });
-      return {
-        ...el,
-        days: newDays,
-      };
-    });
-    localStorage.setItem(LocalStorageKeys.DAYS, JSON.stringify(newCalendarDays));
+      await this.dataService.editData(LocalStorageKeys.DAYS, newCalendarDays);
+    }
   }
 
-  static deleteIdea(id: string) {
-    const localStorageData = localStorage.getItem(LocalStorageKeys.DAYS);
-    const daysFromLocalStorage = JSON.parse(localStorageData as string) as ILocalStorageDays[];
-
-    let newCalendarDays = daysFromLocalStorage.map((el) => {
-      const newDays = el.days.map((day) => {
-        const newIdeas = day.ideas.filter((idea) => idea.id !== id);
+  async deleteData(id: string): Promise<void> {
+    const dataFromDB = await this.dataService.getData<ILocalStorageDays[]>(LocalStorageKeys.DAYS);
+    if (dataFromDB) {
+      let newCalendarDays = dataFromDB.map((el) => {
+        const newDays = el.days.map((day) => {
+          const newIdeas = day.ideas.filter((idea) => idea.id !== id);
+          return {
+            ...day,
+            ideas: newIdeas,
+          };
+        });
         return {
-          ...day,
-          ideas: newIdeas,
+          ...el,
+          days: newDays,
         };
       });
-      return {
+
+      newCalendarDays = newCalendarDays.filter((el) => {
+        // IF DAY HAS`NT ANY IDEAS;
+        if (el.days.length === 1 && el.days[0].ideas.length === 0) {
+          return false;
+        }
+        return true;
+      });
+
+      newCalendarDays = newCalendarDays.map((el) => ({
+        // Delete Days withoud ideas
         ...el,
-        days: newDays,
-      };
-    });
+        days: el.days.filter((day) => day.ideas.length),
+      }));
 
-    newCalendarDays = newCalendarDays.filter((el) => {
-      // IF DAY HAS`NT ANY IDEAS;
-      if (el.days.length === 1 && el.days[0].ideas.length === 0) {
-        return false;
-      }
-      return true;
-    });
-
-    newCalendarDays = newCalendarDays.map((el) => ({
-      // Delete Days withoud ideas
-      ...el,
-      days: el.days.filter((day) => day.ideas.length),
-    }));
-
-    localStorage.setItem(LocalStorageKeys.DAYS, JSON.stringify(newCalendarDays));
+      await this.dataService.editData(LocalStorageKeys.DAYS, newCalendarDays);
+    }
   }
 }
