@@ -1,4 +1,4 @@
-# pavlov_genesis_test
+# pavlov_schedule
 
 ## Used technology stack
 
